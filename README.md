@@ -1,5 +1,7 @@
 # AI Instruction Logger
 
+[中文文档](./README.zh-CN.md)
+
 AI Instruction Logger records user instructions submitted to AI coding tools into a project evidence file.
 
 Default output in the target project:
