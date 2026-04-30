@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -10,7 +10,7 @@ import { installIntegrations } from "../src/installer.mjs"
 
 const execFileAsync = promisify(execFile)
 
-test("install all writes project-level configs and codex wrappers", async () => {
+test("install all writes project-level configs and codex hooks", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const loggerRoot = path.resolve(".")
 
@@ -34,16 +34,14 @@ test("install all writes project-level configs and codex wrappers", async () => 
       path.join(loggerRoot, "integrations", "opencode", "instruction-logger.js"),
     ])
 
-    const unixWrapper = await readFile(path.join(projectRoot, ".ai-instruction-logger", "codex"), "utf8")
-    assert.match(unixWrapper, /exec codex "\$@"/)
-    assert.match(unixWrapper, /--source codex/)
+    const codexHooks = JSON.parse(await readFile(path.join(projectRoot, ".codex", "hooks.json"), "utf8"))
+    const codexCommand = codexHooks.hooks.UserPromptSubmit[0].hooks[0].command
+    assert.match(codexCommand, /--source codex/)
+    assert.match(codexCommand, /--project-root/)
 
-    const windowsWrapper = await readFile(path.join(projectRoot, ".ai-instruction-logger", "codex.cmd"), "utf8")
-    assert.match(windowsWrapper, /@echo off/)
-    assert.match(windowsWrapper, /--source codex/)
-
-    const mode = (await stat(path.join(projectRoot, ".ai-instruction-logger", "codex"))).mode
-    assert.equal(Boolean(mode & 0o111), true)
+    const codexConfig = await readFile(path.join(projectRoot, ".codex", "config.toml"), "utf8")
+    assert.match(codexConfig, /\[features\]/)
+    assert.match(codexConfig, /codex_hooks = true/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }
@@ -102,7 +100,7 @@ test("cli install command targets the requested project root", async () => {
   }
 })
 
-test("npx cache installs generate durable github npx wrappers", async () => {
+test("npx cache installs generate durable github npx hook commands", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const loggerRoot = path.join(tmpdir(), "_npx", "abc", "node_modules", "ai-instruction-logger")
 
@@ -117,9 +115,33 @@ test("npx cache installs generate durable github npx wrappers", async () => {
     const claude = await readFile(path.join(projectRoot, ".claude", "settings.json"), "utf8")
     assert.match(claude, /npx --yes github:CoderIvanLee\/ai-instruction-logger/)
 
-    const unixWrapper = await readFile(path.join(projectRoot, ".ai-instruction-logger", "codex"), "utf8")
-    assert.match(unixWrapper, /npx --yes github:CoderIvanLee\/ai-instruction-logger/)
-    assert.doesNotMatch(unixWrapper, /node_modules\/ai-instruction-logger/)
+    const codexHooks = await readFile(path.join(projectRoot, ".codex", "hooks.json"), "utf8")
+    assert.match(codexHooks, /npx --yes github:CoderIvanLee\/ai-instruction-logger/)
+    assert.doesNotMatch(codexHooks, /node_modules\/ai-instruction-logger/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+  }
+})
+
+test("codex installer enables hooks in an existing features table", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const configPath = path.join(projectRoot, ".codex", "config.toml")
+
+  try {
+    await mkdir(path.dirname(configPath), { recursive: true })
+    await writeFile(configPath, "[features]\nfast_mode = true\n", "utf8")
+
+    await installIntegrations({
+      projectRoot,
+      loggerRoot: path.resolve("."),
+      tools: ["codex"],
+    })
+
+    const config = await readFile(configPath, "utf8")
+    assert.match(config, /\[features\]\ncodex_hooks = true\nfast_mode = true/)
+
+    const backup = await readFile(`${configPath}.bak`, "utf8")
+    assert.match(backup, /fast_mode = true/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }

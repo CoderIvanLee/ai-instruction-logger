@@ -1,4 +1,4 @@
-import { access, chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -87,18 +87,41 @@ async function installOpencode(projectRoot, loggerRoot) {
 }
 
 async function installCodex(projectRoot, loggerRoot, platform) {
-  const installDir = path.join(projectRoot, ".ai-instruction-logger")
-  await mkdir(installDir, { recursive: true })
+  void platform
 
-  const unixPath = path.join(installDir, "codex")
-  const cmdPath = path.join(installDir, "codex.cmd")
+  const codexDir = path.join(projectRoot, ".codex")
+  const hooksPath = path.join(codexDir, "hooks.json")
+  const configPath = path.join(codexDir, "config.toml")
+  const hooks = await readJson(hooksPath, {})
+  const command = [
+    loggerCommand(loggerRoot),
+    "--source codex",
+    "--project-root",
+    quoteArg(projectRoot),
+  ].join(" ")
 
-  await writeFile(unixPath, unixCodexWrapper(loggerRoot), "utf8")
-  await writeFile(cmdPath, windowsCodexWrapper(loggerRoot), "utf8")
+  hooks.hooks = hooks.hooks || {}
+  hooks.hooks.UserPromptSubmit = hooks.hooks.UserPromptSubmit || []
 
-  if (platform !== "win32") {
-    await chmod(unixPath, 0o755)
+  const hookGroup = hooks.hooks.UserPromptSubmit[0] || { hooks: [] }
+  hookGroup.hooks = hookGroup.hooks || []
+
+  const alreadyInstalled = hookGroup.hooks.some((hook) =>
+    typeof hook.command === "string" && hook.command.includes("ai-instruction-logger"),
+  )
+
+  if (!alreadyInstalled) {
+    hookGroup.hooks.push({ type: "command", command })
   }
+
+  if (!hooks.hooks.UserPromptSubmit.length) {
+    hooks.hooks.UserPromptSubmit.push(hookGroup)
+  } else {
+    hooks.hooks.UserPromptSubmit[0] = hookGroup
+  }
+
+  await writeJsonWithBackup(hooksPath, hooks)
+  await enableCodexHooksFeature(configPath)
 }
 
 function normalizePluginList(plugin) {
@@ -149,33 +172,40 @@ function isNpxCacheInstall(loggerRoot) {
   return loggerRoot.includes(`${path.sep}_npx${path.sep}`)
 }
 
-function unixCodexWrapper(loggerRoot) {
-  return `#!/usr/bin/env sh
-set -eu
+async function enableCodexHooksFeature(configPath) {
+  let config = ""
+  const existed = await exists(configPath)
 
-PROJECT_ROOT=\${PROJECT_ROOT:-$(pwd)}
+  if (existed) {
+    config = await readFile(configPath, "utf8")
+    await copyFile(configPath, `${configPath}.bak`)
+  }
 
-if [ "$#" -gt 0 ]; then
-  ${loggerCommand(loggerRoot)} \\
-    --source codex \\
-    --project-root "$PROJECT_ROOT" \\
-    --message "$*"
-fi
-
-exec codex "$@"
-`
+  const nextConfig = setTomlFeature(config, "codex_hooks", "true")
+  await mkdir(path.dirname(configPath), { recursive: true })
+  await writeFile(configPath, nextConfig, "utf8")
 }
 
-function windowsCodexWrapper(loggerRoot) {
-  return `@echo off
-setlocal
+function setTomlFeature(config, key, value) {
+  const assignment = `${key} = ${value}`
+  const existingKey = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  if (existingKey.test(config)) {
+    return ensureTrailingNewline(config.replace(existingKey, assignment))
+  }
 
-if "%PROJECT_ROOT%"=="" set "PROJECT_ROOT=%CD%"
+  const featuresHeader = /^\[features\]\s*$/m
+  if (featuresHeader.test(config)) {
+    return ensureTrailingNewline(config.replace(featuresHeader, `[features]\n${assignment}`))
+  }
 
-if not "%~1"=="" (
-  ${loggerCommand(loggerRoot)} --source codex --project-root "%PROJECT_ROOT%" --message %*
-)
+  const separator = config.trim() ? "\n\n" : ""
+  return ensureTrailingNewline(`${config.trimEnd()}${separator}[features]\n${assignment}`)
+}
 
-codex %*
-`
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function ensureTrailingNewline(value) {
+  return value.endsWith("\n") ? value : `${value}\n`
 }

@@ -31,7 +31,7 @@ npx github:CoderIvanLee/ai-instruction-logger install opencode
 npx github:CoderIvanLee/ai-instruction-logger install codex
 ```
 
-The installer is cross-platform. It writes JSON configs with Node.js and creates both `.ai-instruction-logger/codex` for macOS/Linux and `.ai-instruction-logger/codex.cmd` for Windows.
+The installer is cross-platform. It writes JSON/TOML configs with Node.js and uses project-level hooks where each tool supports them.
 
 You can also install into another project without changing directories:
 
@@ -69,7 +69,7 @@ opencode:
 
 Codex:
 
-`install codex` creates `.ai-instruction-logger/codex` and `.ai-instruction-logger/codex.cmd` in the target project. Codex CLI does not currently provide a prompt-submit hook that can capture every interactive user input.
+`install codex` writes `.codex/hooks.json` and enables `codex_hooks` in `.codex/config.toml`. Codex records user prompts from inside the interactive Codex conversation after the next Codex restart.
 
 Kimi CLI:
 
