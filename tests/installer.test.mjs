@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -53,7 +53,7 @@ test("install all writes project-level configs and codex hooks", async () => {
   }
 })
 
-test("installer preserves existing opencode plugins and creates backups", async () => {
+test("installer preserves existing opencode plugins without creating backups", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const loggerRoot = path.resolve(".")
   const opencodePath = path.join(projectRoot, "opencode.json")
@@ -80,8 +80,7 @@ test("installer preserves existing opencode plugins and creates backups", async 
       path.join(loggerRoot, "integrations", "opencode", "instruction-logger.js"),
     ])
 
-    const backup = await readFile(`${opencodePath}.bak`, "utf8")
-    assert.match(backup, /existing-plugin/)
+    await assert.rejects(access(`${opencodePath}.bak`), /ENOENT/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }
@@ -146,8 +145,7 @@ test("codex installer enables hooks in an existing features table", async () => 
     const config = await readFile(configPath, "utf8")
     assert.match(config, /\[features\]\ncodex_hooks = true\nfast_mode = true/)
 
-    const backup = await readFile(`${configPath}.bak`, "utf8")
-    assert.match(backup, /fast_mode = true/)
+    await assert.rejects(access(`${configPath}.bak`), /ENOENT/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }
@@ -178,7 +176,7 @@ test("kimi-cli installer writes a UserPromptSubmit hook to the kimi config", asy
   }
 })
 
-test("kimi-cli installer preserves existing config and creates a backup", async () => {
+test("kimi-cli installer preserves existing config without creating a backup", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const homeDir = await mkdtemp(path.join(tmpdir(), "instruction-home-"))
   const configPath = path.join(homeDir, ".kimi", "config.toml")
@@ -198,8 +196,7 @@ test("kimi-cli installer preserves existing config and creates a backup", async 
     assert.match(config, /model = "kimi-k2"/)
     assert.match(config, /event = "UserPromptSubmit"/)
 
-    const backup = await readFile(`${configPath}.bak`, "utf8")
-    assert.match(backup, /model = "kimi-k2"/)
+    await assert.rejects(access(`${configPath}.bak`), /ENOENT/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
     await rm(homeDir, { recursive: true, force: true })

@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import { access, mkdir, readFile, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -74,7 +74,7 @@ async function installClaudeCode(projectRoot, loggerRoot) {
     settings.hooks.UserPromptSubmit[0] = hookGroup
   }
 
-  await writeJsonWithBackup(settingsPath, settings)
+  await writeJson(settingsPath, settings)
 }
 
 async function installOpencode(projectRoot, loggerRoot) {
@@ -87,7 +87,7 @@ async function installOpencode(projectRoot, loggerRoot) {
     config.plugin.push(pluginPath)
   }
 
-  await writeJsonWithBackup(configPath, config)
+  await writeJson(configPath, config)
 }
 
 async function installCodex(projectRoot, loggerRoot, platform) {
@@ -124,7 +124,7 @@ async function installCodex(projectRoot, loggerRoot, platform) {
     hooks.hooks.UserPromptSubmit[0] = hookGroup
   }
 
-  await writeJsonWithBackup(hooksPath, hooks)
+  await writeJson(hooksPath, hooks)
   await enableCodexHooksFeature(configPath)
 }
 
@@ -153,11 +153,8 @@ async function readJson(filePath, fallback) {
   }
 }
 
-async function writeJsonWithBackup(filePath, data) {
+async function writeJson(filePath, data) {
   await mkdir(path.dirname(filePath), { recursive: true })
-  if (await exists(filePath)) {
-    await copyFile(filePath, `${filePath}.bak`)
-  }
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8")
 }
 
@@ -192,7 +189,6 @@ async function enableCodexHooksFeature(configPath) {
 
   if (existed) {
     config = await readFile(configPath, "utf8")
-    await copyFile(configPath, `${configPath}.bak`)
   }
 
   const nextConfig = setTomlFeature(config, "codex_hooks", "true")
@@ -206,7 +202,6 @@ async function appendKimiHook(configPath, command) {
 
   if (existed) {
     config = await readFile(configPath, "utf8")
-    await copyFile(configPath, `${configPath}.bak`)
   }
 
   if (config.includes("ai-instruction-logger") && config.includes("UserPromptSubmit")) {

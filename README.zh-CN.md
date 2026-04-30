@@ -159,15 +159,9 @@ cat docs/copyright-evidence/instructions.md
 | Codex | 需要 | 重新读取 `.codex/hooks.json` 和 `.codex/config.toml` |
 | Kimi CLI | 需要 | 重新读取 `~/.kimi/config.toml` |
 
-## 备份策略
+## 覆盖策略
 
-安装器在修改已有配置文件前，会生成 `.bak` 备份。例如：
-
-```text
-opencode.json.bak
-.codex/config.toml.bak
-~/.kimi/config.toml.bak
-```
+安装器会直接更新原配置文件，不额外生成 `.bak` 备份。它会尽量保留已有配置，只追加或更新本工具需要的 hook 配置。
 
 ## 注意事项
 
