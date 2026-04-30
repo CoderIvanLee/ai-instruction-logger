@@ -16,6 +16,23 @@ export INSTRUCTION_LOG_FILE=".chat/instruction.md"
 
 ## Usage
 
+Install project-level integrations:
+
+```sh
+npx ai-instruction-logger install all
+npx ai-instruction-logger install claude-code
+npx ai-instruction-logger install opencode
+npx ai-instruction-logger install codex
+```
+
+Without npm publishing, run from this repository:
+
+```sh
+node /ABSOLUTE/PATH/TO/ai-instruction-logger/bin/ai-instruction-logger.mjs install all --project-root /path/to/project
+```
+
+The installer is cross-platform. It writes JSON configs with Node.js and creates both `.ai-instruction-logger/codex` for macOS/Linux and `.ai-instruction-logger/codex.cmd` for Windows.
+
 Record a message manually:
 
 ```sh

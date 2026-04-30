@@ -3,6 +3,7 @@
 import { appendFile, mkdir } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { installIntegrations } from "./installer.mjs"
 
 const DEFAULT_RELATIVE_FILE = path.join("docs", "copyright-evidence", "instructions.md")
 
@@ -99,6 +100,14 @@ function parseArgs(argv) {
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
+  if (argv[0] === "install") {
+    const { tools, projectRoot } = parseInstallArgs(argv.slice(1))
+    const result = await installIntegrations({ tools, projectRoot })
+    console.log(`Installed: ${result.installed.join(", ")}`)
+    console.log(`Project: ${result.projectRoot}`)
+    return
+  }
+
   const options = parseArgs(argv)
   let instruction = options.message
 
@@ -117,6 +126,22 @@ export async function runCli(argv = process.argv.slice(2)) {
     instruction,
     outputFile: options.outputFile,
   })
+}
+
+function parseInstallArgs(argv) {
+  const tools = []
+  let projectRoot = process.cwd()
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
+    if (arg === "--project-root") {
+      projectRoot = argv[++i] || projectRoot
+    } else {
+      tools.push(arg)
+    }
+  }
+
+  return { tools: tools.length ? tools : ["all"], projectRoot }
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : ""

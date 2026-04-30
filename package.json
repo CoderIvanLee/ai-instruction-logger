@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/instruction-logger.mjs && node --check integrations/opencode/instruction-logger.js"
+    "check": "node --check src/instruction-logger.mjs && node --check src/installer.mjs && node --check integrations/opencode/instruction-logger.js"
   },
   "license": "MIT",
   "engines": {
