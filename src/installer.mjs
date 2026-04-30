@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -18,23 +18,24 @@ export async function installIntegrations({
   const normalizedLoggerRoot = path.resolve(loggerRoot)
   const requested = expandTools(tools)
   const installed = []
+  const backups = []
 
   for (const tool of requested) {
     if (tool === "claude-code") {
-      await installClaudeCode(normalizedProjectRoot, normalizedLoggerRoot)
+      backups.push(...await installClaudeCode(normalizedProjectRoot, normalizedLoggerRoot))
     } else if (tool === "opencode") {
-      await installOpencode(normalizedProjectRoot, normalizedLoggerRoot)
+      backups.push(...await installOpencode(normalizedProjectRoot, normalizedLoggerRoot))
     } else if (tool === "codex") {
-      await installCodex(normalizedProjectRoot, normalizedLoggerRoot, platform)
+      backups.push(...await installCodex(normalizedProjectRoot, normalizedLoggerRoot, platform))
     } else if (tool === "kimi-cli" || tool === "kimi") {
-      await installKimiCli(normalizedLoggerRoot, homeDir)
+      backups.push(...await installKimiCli(normalizedLoggerRoot, homeDir))
     } else {
       throw new Error(`Unsupported tool: ${tool}`)
     }
     installed.push(tool === "kimi" ? "kimi-cli" : tool)
   }
 
-  return { projectRoot: normalizedProjectRoot, loggerRoot: normalizedLoggerRoot, installed }
+  return { projectRoot: normalizedProjectRoot, loggerRoot: normalizedLoggerRoot, installed, backups }
 }
 
 function expandTools(tools) {
@@ -74,7 +75,7 @@ async function installClaudeCode(projectRoot, loggerRoot) {
     settings.hooks.UserPromptSubmit[0] = hookGroup
   }
 
-  await writeJson(settingsPath, settings)
+  return await writeJson(settingsPath, settings)
 }
 
 async function installOpencode(projectRoot, loggerRoot) {
@@ -87,7 +88,7 @@ async function installOpencode(projectRoot, loggerRoot) {
     config.plugin.push(pluginPath)
   }
 
-  await writeJson(configPath, config)
+  return await writeJson(configPath, config)
 }
 
 async function installCodex(projectRoot, loggerRoot, platform) {
@@ -124,8 +125,10 @@ async function installCodex(projectRoot, loggerRoot, platform) {
     hooks.hooks.UserPromptSubmit[0] = hookGroup
   }
 
-  await writeJson(hooksPath, hooks)
-  await enableCodexHooksFeature(configPath)
+  return [
+    ...await writeJson(hooksPath, hooks),
+    ...await enableCodexHooksFeature(configPath),
+  ]
 }
 
 async function installKimiCli(loggerRoot, homeDir) {
@@ -135,7 +138,7 @@ async function installKimiCli(loggerRoot, homeDir) {
     "--source kimi-cli",
   ].join(" ")
 
-  await appendKimiHook(configPath, command)
+  return await appendKimiHook(configPath, command)
 }
 
 function normalizePluginList(plugin) {
@@ -154,8 +157,41 @@ async function readJson(filePath, fallback) {
 }
 
 async function writeJson(filePath, data) {
+  return await writeText(filePath, `${JSON.stringify(data, null, 2)}\n`)
+}
+
+async function writeText(filePath, content) {
   await mkdir(path.dirname(filePath), { recursive: true })
-  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8")
+  const backup = await backupIfChanged(filePath, content)
+  await writeFile(filePath, content, "utf8")
+  return backup ? [backup] : []
+}
+
+async function backupIfChanged(filePath, nextContent) {
+  if (!await exists(filePath)) return null
+
+  const currentContent = await readFile(filePath, "utf8")
+  if (currentContent === nextContent) return null
+
+  const backupPath = await nextBackupPath(filePath)
+  await copyFile(filePath, backupPath)
+  return backupPath
+}
+
+async function nextBackupPath(filePath) {
+  const first = `${filePath}.bak`
+  if (!await exists(first)) return first
+
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")
+  let candidate = `${filePath}.${stamp}.bak`
+  let index = 1
+
+  while (await exists(candidate)) {
+    candidate = `${filePath}.${stamp}.${index}.bak`
+    index += 1
+  }
+
+  return candidate
 }
 
 async function exists(filePath) {
@@ -192,8 +228,7 @@ async function enableCodexHooksFeature(configPath) {
   }
 
   const nextConfig = setTomlFeature(config, "codex_hooks", "true")
-  await mkdir(path.dirname(configPath), { recursive: true })
-  await writeFile(configPath, nextConfig, "utf8")
+  return await writeText(configPath, nextConfig)
 }
 
 async function appendKimiHook(configPath, command) {
@@ -205,7 +240,7 @@ async function appendKimiHook(configPath, command) {
   }
 
   if (config.includes("ai-instruction-logger") && config.includes("UserPromptSubmit")) {
-    return
+    return []
   }
 
   const block = [
@@ -216,8 +251,7 @@ async function appendKimiHook(configPath, command) {
   ].join("\n")
 
   const nextConfig = `${config.trimEnd()}${config.trim() ? "\n\n" : ""}${block}`
-  await mkdir(path.dirname(configPath), { recursive: true })
-  await writeFile(configPath, nextConfig, "utf8")
+  return await writeText(configPath, nextConfig)
 }
 
 function setTomlFeature(config, key, value) {

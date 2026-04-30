@@ -36,6 +36,8 @@ npx github:CoderIvanLee/ai-instruction-logger install kimi-cli
 
 The installer is cross-platform. It writes JSON/TOML configs with Node.js and uses project-level hooks where each tool supports them.
 
+If an existing config file changes, the installer creates a `.bak` backup first and prints every backup path in the install output. If the content is unchanged, no duplicate backup is created.
+
 You can also install into another project without changing directories:
 
 ```sh

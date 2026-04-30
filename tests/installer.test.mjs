@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -53,7 +53,7 @@ test("install all writes project-level configs and codex hooks", async () => {
   }
 })
 
-test("installer preserves existing opencode plugins without creating backups", async () => {
+test("installer preserves existing opencode plugins and reports backups", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const loggerRoot = path.resolve(".")
   const opencodePath = path.join(projectRoot, "opencode.json")
@@ -67,7 +67,7 @@ test("installer preserves existing opencode plugins without creating backups", a
       `,
     ])
 
-    await installIntegrations({
+    const result = await installIntegrations({
       projectRoot,
       loggerRoot,
       tools: ["opencode"],
@@ -80,7 +80,9 @@ test("installer preserves existing opencode plugins without creating backups", a
       path.join(loggerRoot, "integrations", "opencode", "instruction-logger.js"),
     ])
 
-    await assert.rejects(access(`${opencodePath}.bak`), /ENOENT/)
+    assert.deepEqual(result.backups, [`${opencodePath}.bak`])
+    const backup = await readFile(`${opencodePath}.bak`, "utf8")
+    assert.match(backup, /existing-plugin/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }
@@ -136,7 +138,7 @@ test("codex installer enables hooks in an existing features table", async () => 
     await mkdir(path.dirname(configPath), { recursive: true })
     await writeFile(configPath, "[features]\nfast_mode = true\n", "utf8")
 
-    await installIntegrations({
+    const result = await installIntegrations({
       projectRoot,
       loggerRoot: path.resolve("."),
       tools: ["codex"],
@@ -145,7 +147,9 @@ test("codex installer enables hooks in an existing features table", async () => 
     const config = await readFile(configPath, "utf8")
     assert.match(config, /\[features\]\ncodex_hooks = true\nfast_mode = true/)
 
-    await assert.rejects(access(`${configPath}.bak`), /ENOENT/)
+    assert.deepEqual(result.backups, [`${configPath}.bak`])
+    const backup = await readFile(`${configPath}.bak`, "utf8")
+    assert.match(backup, /fast_mode = true/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
   }
@@ -176,7 +180,7 @@ test("kimi-cli installer writes a UserPromptSubmit hook to the kimi config", asy
   }
 })
 
-test("kimi-cli installer preserves existing config without creating a backup", async () => {
+test("kimi-cli installer preserves existing config and reports a backup", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
   const homeDir = await mkdtemp(path.join(tmpdir(), "instruction-home-"))
   const configPath = path.join(homeDir, ".kimi", "config.toml")
@@ -185,7 +189,7 @@ test("kimi-cli installer preserves existing config without creating a backup", a
     await mkdir(path.dirname(configPath), { recursive: true })
     await writeFile(configPath, "model = \"kimi-k2\"\n", "utf8")
 
-    await installIntegrations({
+    const result = await installIntegrations({
       projectRoot,
       loggerRoot: path.resolve("."),
       tools: ["kimi-cli"],
@@ -196,9 +200,56 @@ test("kimi-cli installer preserves existing config without creating a backup", a
     assert.match(config, /model = "kimi-k2"/)
     assert.match(config, /event = "UserPromptSubmit"/)
 
-    await assert.rejects(access(`${configPath}.bak`), /ENOENT/)
+    assert.deepEqual(result.backups, [`${configPath}.bak`])
+    const backup = await readFile(`${configPath}.bak`, "utf8")
+    assert.match(backup, /model = "kimi-k2"/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
     await rm(homeDir, { recursive: true, force: true })
+  }
+})
+
+test("installer does not create a backup when config content is unchanged", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const loggerRoot = path.resolve(".")
+
+  try {
+    const first = await installIntegrations({
+      projectRoot,
+      loggerRoot,
+      tools: ["codex"],
+    })
+    const second = await installIntegrations({
+      projectRoot,
+      loggerRoot,
+      tools: ["codex"],
+    })
+
+    assert.deepEqual(first.backups, [])
+    assert.deepEqual(second.backups, [])
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+  }
+})
+
+test("cli install output lists backup files", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const opencodePath = path.join(projectRoot, "opencode.json")
+
+  try {
+    await writeFile(opencodePath, JSON.stringify({ plugin: ["existing-plugin"] }, null, 2), "utf8")
+
+    const { stdout } = await execFileAsync("node", [
+      "bin/ai-instruction-logger.mjs",
+      "install",
+      "opencode",
+      "--project-root",
+      projectRoot,
+    ])
+
+    assert.match(stdout, /Backups:/)
+    assert.match(stdout, /opencode\.json\.bak/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
   }
 })

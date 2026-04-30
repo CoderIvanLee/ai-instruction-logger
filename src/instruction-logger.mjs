@@ -105,6 +105,14 @@ export async function runCli(argv = process.argv.slice(2)) {
     const result = await installIntegrations({ tools, projectRoot })
     console.log(`Installed: ${result.installed.join(", ")}`)
     console.log(`Project: ${result.projectRoot}`)
+    if (result.backups.length) {
+      console.log("Backups:")
+      for (const backup of result.backups) {
+        console.log(`- ${backup}`)
+      }
+    } else {
+      console.log("Backups: none")
+    }
     return
   }
 
