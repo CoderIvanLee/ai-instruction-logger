@@ -1,6 +1,6 @@
 # AI Instruction Logger
 
-AI Instruction Logger 用于记录用户在 AI 编程工具中输入的需求和指令，并写入项目目录中的证据文件，方便后续整理研发过程和著作权申请材料。
+AI Instruction Logger 用于记录用户在 AI 编程工具中输入的需求和指令，并写入项目目录中的证据文件，用于优化指令和软件著作权申请提供资料。
 
 默认记录文件：
 

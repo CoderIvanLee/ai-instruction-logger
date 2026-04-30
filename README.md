@@ -2,7 +2,7 @@
 
 [中文文档](./README.zh-CN.md)
 
-AI Instruction Logger records user instructions submitted to AI coding tools into a project evidence file.
+AI Instruction Logger records user instructions submitted to AI coding tools into a project evidence file for prompt optimization and software copyright application materials.
 
 Default output in the target project:
 
