@@ -1,0 +1,5 @@
+{
+  "plugin": [
+    "/ABSOLUTE/PATH/TO/ai-instruction-logger/integrations/opencode/instruction-logger.js"
+  ]
+}

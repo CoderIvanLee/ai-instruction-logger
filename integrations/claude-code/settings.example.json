@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/ABSOLUTE/PATH/TO/ai-instruction-logger/bin/ai-instruction-logger.mjs\" --source claude-code --project-root \"$CLAUDE_PROJECT_DIR\""
+          }
+        ]
+      }
+    ]
+  }
+}

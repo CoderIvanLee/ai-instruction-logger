@@ -1,0 +1,18 @@
+{
+  "name": "ai-instruction-logger",
+  "version": "0.1.0",
+  "description": "Record user instructions from AI coding CLIs for project copyright evidence.",
+  "type": "module",
+  "bin": {
+    "ai-instruction-logger": "./bin/ai-instruction-logger.mjs",
+    "codex-with-instruction-log": "./bin/codex-with-instruction-log.sh"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/instruction-logger.mjs && node --check integrations/opencode/instruction-logger.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}
