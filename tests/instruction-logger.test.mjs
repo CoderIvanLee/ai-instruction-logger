@@ -98,3 +98,27 @@ test("cli records direct message arguments", async () => {
     await rm(projectRoot, { recursive: true, force: true })
   }
 })
+
+test("cli uses hook payload cwd when project root is not specified", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-log-"))
+
+  try {
+    await execFileAsync("sh", [
+      "-c",
+      `printf %s ${JSON.stringify(JSON.stringify({
+        hook_event_name: "UserPromptSubmit",
+        cwd: projectRoot,
+        prompt: "在 Kimi 内部输入的指令",
+      }))} | node bin/ai-instruction-logger.mjs --source kimi-cli`,
+    ])
+
+    const content = await readFile(
+      path.join(projectRoot, "docs", "copyright-evidence", "instructions.md"),
+      "utf8",
+    )
+
+    assert.match(content, /\[kimi-cli\] 在 Kimi 内部输入的指令\n$/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+  }
+})

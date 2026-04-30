@@ -29,6 +29,7 @@ Install one tool at a time:
 npx github:CoderIvanLee/ai-instruction-logger install claude-code
 npx github:CoderIvanLee/ai-instruction-logger install opencode
 npx github:CoderIvanLee/ai-instruction-logger install codex
+npx github:CoderIvanLee/ai-instruction-logger install kimi-cli
 ```
 
 The installer is cross-platform. It writes JSON/TOML configs with Node.js and uses project-level hooks where each tool supports them.
@@ -73,7 +74,7 @@ Codex:
 
 Kimi CLI:
 
-Reserved under `integrations/kimi-cli/` for the next integration.
+`install kimi-cli` writes a `UserPromptSubmit` hook into `~/.kimi/config.toml`. Kimi CLI records user prompts from inside the interactive Kimi conversation after the next Kimi restart. The hook uses Kimi's `cwd` payload field, so prompts are recorded into the project where `kimi` or `kimi-cli` was started.
 
 ## Development
 

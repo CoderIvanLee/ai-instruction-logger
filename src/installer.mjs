@@ -1,8 +1,9 @@
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-const TOOL_ORDER = ["claude-code", "opencode", "codex"]
+const TOOL_ORDER = ["claude-code", "opencode", "codex", "kimi-cli"]
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const GITHUB_NPX_SPEC = "github:CoderIvanLee/ai-instruction-logger"
 
@@ -11,6 +12,7 @@ export async function installIntegrations({
   loggerRoot = ROOT,
   tools = ["all"],
   platform = process.platform,
+  homeDir = os.homedir(),
 } = {}) {
   const normalizedProjectRoot = path.resolve(projectRoot)
   const normalizedLoggerRoot = path.resolve(loggerRoot)
@@ -24,10 +26,12 @@ export async function installIntegrations({
       await installOpencode(normalizedProjectRoot, normalizedLoggerRoot)
     } else if (tool === "codex") {
       await installCodex(normalizedProjectRoot, normalizedLoggerRoot, platform)
+    } else if (tool === "kimi-cli" || tool === "kimi") {
+      await installKimiCli(normalizedLoggerRoot, homeDir)
     } else {
       throw new Error(`Unsupported tool: ${tool}`)
     }
-    installed.push(tool)
+    installed.push(tool === "kimi" ? "kimi-cli" : tool)
   }
 
   return { projectRoot: normalizedProjectRoot, loggerRoot: normalizedLoggerRoot, installed }
@@ -124,6 +128,16 @@ async function installCodex(projectRoot, loggerRoot, platform) {
   await enableCodexHooksFeature(configPath)
 }
 
+async function installKimiCli(loggerRoot, homeDir) {
+  const configPath = path.join(homeDir, ".kimi", "config.toml")
+  const command = [
+    loggerCommand(loggerRoot),
+    "--source kimi-cli",
+  ].join(" ")
+
+  await appendKimiHook(configPath, command)
+}
+
 function normalizePluginList(plugin) {
   if (!plugin) return []
   if (Array.isArray(plugin)) return plugin
@@ -182,6 +196,31 @@ async function enableCodexHooksFeature(configPath) {
   }
 
   const nextConfig = setTomlFeature(config, "codex_hooks", "true")
+  await mkdir(path.dirname(configPath), { recursive: true })
+  await writeFile(configPath, nextConfig, "utf8")
+}
+
+async function appendKimiHook(configPath, command) {
+  let config = ""
+  const existed = await exists(configPath)
+
+  if (existed) {
+    config = await readFile(configPath, "utf8")
+    await copyFile(configPath, `${configPath}.bak`)
+  }
+
+  if (config.includes("ai-instruction-logger") && config.includes("UserPromptSubmit")) {
+    return
+  }
+
+  const block = [
+    "[[hooks]]",
+    'event = "UserPromptSubmit"',
+    `command = ${quoteArg(command)}`,
+    "",
+  ].join("\n")
+
+  const nextConfig = `${config.trimEnd()}${config.trim() ? "\n\n" : ""}${block}`
   await mkdir(path.dirname(configPath), { recursive: true })
   await writeFile(configPath, nextConfig, "utf8")
 }

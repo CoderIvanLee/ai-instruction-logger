@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile)
 
 test("install all writes project-level configs and codex hooks", async () => {
   const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const homeDir = await mkdtemp(path.join(tmpdir(), "instruction-home-"))
   const loggerRoot = path.resolve(".")
 
   try {
@@ -20,9 +21,10 @@ test("install all writes project-level configs and codex hooks", async () => {
       loggerRoot,
       tools: ["all"],
       platform: "linux",
+      homeDir,
     })
 
-    assert.deepEqual(result.installed, ["claude-code", "opencode", "codex"])
+    assert.deepEqual(result.installed, ["claude-code", "opencode", "codex", "kimi-cli"])
 
     const claude = JSON.parse(await readFile(path.join(projectRoot, ".claude", "settings.json"), "utf8"))
     const command = claude.hooks.UserPromptSubmit[0].hooks[0].command
@@ -42,8 +44,12 @@ test("install all writes project-level configs and codex hooks", async () => {
     const codexConfig = await readFile(path.join(projectRoot, ".codex", "config.toml"), "utf8")
     assert.match(codexConfig, /\[features\]/)
     assert.match(codexConfig, /codex_hooks = true/)
+
+    const kimiConfig = await readFile(path.join(homeDir, ".kimi", "config.toml"), "utf8")
+    assert.match(kimiConfig, /event = "UserPromptSubmit"/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
+    await rm(homeDir, { recursive: true, force: true })
   }
 })
 
@@ -144,5 +150,58 @@ test("codex installer enables hooks in an existing features table", async () => 
     assert.match(backup, /fast_mode = true/)
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
+  }
+})
+
+test("kimi-cli installer writes a UserPromptSubmit hook to the kimi config", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const homeDir = await mkdtemp(path.join(tmpdir(), "instruction-home-"))
+
+  try {
+    const result = await installIntegrations({
+      projectRoot,
+      loggerRoot: path.resolve("."),
+      tools: ["kimi-cli"],
+      homeDir,
+    })
+
+    assert.deepEqual(result.installed, ["kimi-cli"])
+
+    const config = await readFile(path.join(homeDir, ".kimi", "config.toml"), "utf8")
+    assert.match(config, /\[\[hooks\]\]/)
+    assert.match(config, /event = "UserPromptSubmit"/)
+    assert.match(config, /--source kimi-cli/)
+    assert.doesNotMatch(config, /--project-root/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+    await rm(homeDir, { recursive: true, force: true })
+  }
+})
+
+test("kimi-cli installer preserves existing config and creates a backup", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const homeDir = await mkdtemp(path.join(tmpdir(), "instruction-home-"))
+  const configPath = path.join(homeDir, ".kimi", "config.toml")
+
+  try {
+    await mkdir(path.dirname(configPath), { recursive: true })
+    await writeFile(configPath, "model = \"kimi-k2\"\n", "utf8")
+
+    await installIntegrations({
+      projectRoot,
+      loggerRoot: path.resolve("."),
+      tools: ["kimi-cli"],
+      homeDir,
+    })
+
+    const config = await readFile(configPath, "utf8")
+    assert.match(config, /model = "kimi-k2"/)
+    assert.match(config, /event = "UserPromptSubmit"/)
+
+    const backup = await readFile(`${configPath}.bak`, "utf8")
+    assert.match(backup, /model = "kimi-k2"/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+    await rm(homeDir, { recursive: true, force: true })
   }
 })

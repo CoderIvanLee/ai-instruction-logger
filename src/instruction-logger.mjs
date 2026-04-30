@@ -77,7 +77,7 @@ async function readStdin() {
 function parseArgs(argv) {
   const options = {
     source: "manual",
-    projectRoot: process.cwd(),
+    projectRoot: undefined,
     message: "",
   }
 
@@ -110,18 +110,20 @@ export async function runCli(argv = process.argv.slice(2)) {
 
   const options = parseArgs(argv)
   let instruction = options.message
+  let payload = null
 
   const stdin = instruction ? "" : await readStdin()
   if (!instruction && stdin.trim()) {
     try {
-      instruction = extractInstruction(JSON.parse(stdin))
+      payload = JSON.parse(stdin)
+      instruction = extractInstruction(payload)
     } catch {
       instruction = stdin
     }
   }
 
   await recordInstruction({
-    projectRoot: options.projectRoot,
+    projectRoot: options.projectRoot || payload?.cwd || process.cwd(),
     source: options.source,
     instruction,
     outputFile: options.outputFile,
