@@ -101,3 +101,26 @@ test("cli install command targets the requested project root", async () => {
     await rm(projectRoot, { recursive: true, force: true })
   }
 })
+
+test("npx cache installs generate durable github npx wrappers", async () => {
+  const projectRoot = await mkdtemp(path.join(tmpdir(), "instruction-install-"))
+  const loggerRoot = path.join(tmpdir(), "_npx", "abc", "node_modules", "ai-instruction-logger")
+
+  try {
+    await installIntegrations({
+      projectRoot,
+      loggerRoot,
+      tools: ["claude-code", "codex"],
+      platform: "linux",
+    })
+
+    const claude = await readFile(path.join(projectRoot, ".claude", "settings.json"), "utf8")
+    assert.match(claude, /npx --yes github:CoderIvanLee\/ai-instruction-logger/)
+
+    const unixWrapper = await readFile(path.join(projectRoot, ".ai-instruction-logger", "codex"), "utf8")
+    assert.match(unixWrapper, /npx --yes github:CoderIvanLee\/ai-instruction-logger/)
+    assert.doesNotMatch(unixWrapper, /node_modules\/ai-instruction-logger/)
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true })
+  }
+})

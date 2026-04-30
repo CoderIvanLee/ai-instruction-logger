@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 
 const TOOL_ORDER = ["claude-code", "opencode", "codex"]
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const GITHUB_NPX_SPEC = "github:CoderIvanLee/ai-instruction-logger"
 
 export async function installIntegrations({
   projectRoot = process.cwd(),
@@ -43,8 +44,7 @@ async function installClaudeCode(projectRoot, loggerRoot) {
   const settingsPath = path.join(projectRoot, ".claude", "settings.json")
   const settings = await readJson(settingsPath, {})
   const command = [
-    "node",
-    quoteArg(path.join(loggerRoot, "bin", "ai-instruction-logger.mjs")),
+    loggerCommand(loggerRoot),
     "--source claude-code",
     "--project-root",
     quoteArg(projectRoot),
@@ -92,10 +92,9 @@ async function installCodex(projectRoot, loggerRoot, platform) {
 
   const unixPath = path.join(installDir, "codex")
   const cmdPath = path.join(installDir, "codex.cmd")
-  const loggerBin = path.join(loggerRoot, "bin", "ai-instruction-logger.mjs")
 
-  await writeFile(unixPath, unixCodexWrapper(loggerBin), "utf8")
-  await writeFile(cmdPath, windowsCodexWrapper(loggerBin), "utf8")
+  await writeFile(unixPath, unixCodexWrapper(loggerRoot), "utf8")
+  await writeFile(cmdPath, windowsCodexWrapper(loggerRoot), "utf8")
 
   if (platform !== "win32") {
     await chmod(unixPath, 0o755)
@@ -138,14 +137,26 @@ function quoteArg(value) {
   return JSON.stringify(value)
 }
 
-function unixCodexWrapper(loggerBin) {
+function loggerCommand(loggerRoot) {
+  if (isNpxCacheInstall(loggerRoot)) {
+    return `npx --yes ${GITHUB_NPX_SPEC}`
+  }
+
+  return `node ${quoteArg(path.join(loggerRoot, "bin", "ai-instruction-logger.mjs"))}`
+}
+
+function isNpxCacheInstall(loggerRoot) {
+  return loggerRoot.includes(`${path.sep}_npx${path.sep}`)
+}
+
+function unixCodexWrapper(loggerRoot) {
   return `#!/usr/bin/env sh
 set -eu
 
 PROJECT_ROOT=\${PROJECT_ROOT:-$(pwd)}
 
 if [ "$#" -gt 0 ]; then
-  node ${quoteArg(loggerBin)} \\
+  ${loggerCommand(loggerRoot)} \\
     --source codex \\
     --project-root "$PROJECT_ROOT" \\
     --message "$*"
@@ -155,14 +166,14 @@ exec codex "$@"
 `
 }
 
-function windowsCodexWrapper(loggerBin) {
+function windowsCodexWrapper(loggerRoot) {
   return `@echo off
 setlocal
 
 if "%PROJECT_ROOT%"=="" set "PROJECT_ROOT=%CD%"
 
 if not "%~1"=="" (
-  node ${quoteArg(loggerBin)} --source codex --project-root "%PROJECT_ROOT%" --message %*
+  ${loggerCommand(loggerRoot)} --source codex --project-root "%PROJECT_ROOT%" --message %*
 )
 
 codex %*

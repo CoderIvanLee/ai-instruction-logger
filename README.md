@@ -16,48 +16,60 @@ export INSTRUCTION_LOG_FILE=".chat/instruction.md"
 
 ## Usage
 
-Install project-level integrations:
+Run the installer from the project you want to record:
 
 ```sh
-npx ai-instruction-logger install all
-npx ai-instruction-logger install claude-code
-npx ai-instruction-logger install opencode
-npx ai-instruction-logger install codex
+cd /path/to/your-project
+npx github:CoderIvanLee/ai-instruction-logger install all
 ```
 
-Without npm publishing, run from this repository:
+Install one tool at a time:
 
 ```sh
-node /ABSOLUTE/PATH/TO/ai-instruction-logger/bin/ai-instruction-logger.mjs install all --project-root /path/to/project
+npx github:CoderIvanLee/ai-instruction-logger install claude-code
+npx github:CoderIvanLee/ai-instruction-logger install opencode
+npx github:CoderIvanLee/ai-instruction-logger install codex
 ```
 
 The installer is cross-platform. It writes JSON configs with Node.js and creates both `.ai-instruction-logger/codex` for macOS/Linux and `.ai-instruction-logger/codex.cmd` for Windows.
 
+You can also install into another project without changing directories:
+
+```sh
+npx github:CoderIvanLee/ai-instruction-logger install all --project-root /path/to/your-project
+```
+
+After npm publishing, the shorter form will also work:
+
+```sh
+npx ai-instruction-logger install all
+```
+
 Record a message manually:
 
 ```sh
-node bin/ai-instruction-logger.mjs --source manual --project-root /path/to/project --message "开发一个功能"
+npx github:CoderIvanLee/ai-instruction-logger --source manual --project-root /path/to/project --message "开发一个功能"
 ```
 
 Read a hook payload from stdin:
 
 ```sh
-printf '{"prompt":"用户输入"}' | node bin/ai-instruction-logger.mjs --source claude-code --project-root /path/to/project
+printf '{"prompt":"用户输入"}' | npx github:CoderIvanLee/ai-instruction-logger --source claude-code --project-root /path/to/project
 ```
 
 ## Integrations
 
 Claude Code:
 
-Copy `integrations/claude-code/settings.example.json` into the target project's `.claude/settings.json`, then replace `/ABSOLUTE/PATH/TO/ai-instruction-logger` with this repository path.
+`install claude-code` writes `.claude/settings.json` in the target project and registers a `UserPromptSubmit` hook.
 
 opencode:
 
-Use `integrations/opencode/opencode.example.json` as the target project's opencode plugin configuration, then replace `/ABSOLUTE/PATH/TO/ai-instruction-logger`.
+`install opencode` writes or merges `opencode.json` in the target project and registers the opencode plugin.
 
 Codex:
 
-Use `bin/codex-with-instruction-log.sh` for command-line prompts. Codex CLI does not currently provide a prompt-submit hook that can capture every interactive user input.
+`install codex` creates `.ai-instruction-logger/codex` and `.ai-instruction-logger/codex.cmd` in the target project. Codex CLI does not currently provide a prompt-submit hook that can capture every interactive user input.
 
 Kimi CLI:
 
